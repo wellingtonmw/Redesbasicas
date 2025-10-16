@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Explorador Interativo de Redes</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Calm Harmony -->
+    <!-- Application Structure Plan: A single-page, multi-section layout with a sticky top navigation for easy access to topics. Each section focuses on a core networking concept, combining concise text with a dedicated interactive element (e.g., subnet calculator, address decomposer, comparison visualizer) to transform passive learning from the source slides into an active, exploratory experience. This structure was chosen to allow both linear learning and quick reference, improving usability over a static presentation. -->
+    <!-- Visualization & Content Choices:
+        - Report Info: IPv4/IPv6 address space. -> Goal: Compare/Impact. -> Viz: Logarithmic Bar Chart. -> Interaction: Tooltips. -> Justification: Visually conveys the immense scale difference, a key takeaway. -> Library: Chart.js.
+        - Report Info: Subnetting. -> Goal: Demonstrate. -> Viz: Interactive Form/Calculator. -> Interaction: User input triggers real-time calculation of network/host IDs. -> Justification: Active learning is superior for this complex topic. -> Library: Vanilla JS.
+        - Report Info: NAT/Gateway. -> Goal: Explain a process. -> Viz: HTML/CSS diagram. -> Interaction: Hover to highlight data flow path. -> Justification: Simple, effective visualization without external assets. -> Library: HTML/CSS/JS.
+        - Report Info: IPv4 vs IPv6 table. -> Goal: Compare. -> Viz: Interactive comparison cards. -> Interaction: User clicks a feature to see details side-by-side. -> Justification: More engaging than a static table. -> Library: Vanilla JS. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #FDFBF8;
+            color: #4A4A4A;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px;
+            max-height: 400px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 350px;
+            }
+        }
+        html {
+            scroll-behavior: smooth;
+        }
+        .nav-link {
+            transition: color 0.3s, border-bottom-color 0.3s;
+        }
+        .active-link {
+            color: #2563EB;
+            border-bottom-color: #2563EB;
+        }
+        .inactive-link {
+            color: #4A4A4A;
+            border-bottom-color: transparent;
+        }
+        .interactive-box {
+            background-color: #FFFFFF;
+            border: 1px solid #E5E7EB;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+        .console {
+            background-color: #1E293B;
+            color: #E2E8F0;
+            font-family: 'Courier New', Courier, monospace;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            height: 250px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        .packet {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            transition: all 1s ease-in-out;
+            opacity: 0;
+            z-index: 10;
+        }
+        .command-input {
+            background: transparent;
+            border: none;
+            outline: none;
+            color: #E2E8F0;
+            width: 100%;
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <header class="bg-white/80 backdrop-blur-md sticky top-0 z-50 shadow-sm">
+        <nav class="container mx-auto px-6 py-4">
+            <div class="flex items-center justify-between">
+                <a href="#" class="text-xl font-bold text-blue-600">Redes 101</a>
+                <div class="hidden md:flex items-center space-x-8" id="nav-menu">
+                    <a href="#ipv4" class="nav-link border-b-2 pb-1">IPv4</a>
+                    <a href="#mascara" class="nav-link border-b-2 pb-1">Máscara</a>
+                    <a href="#gateway" class="nav-link border-b-2 pb-1">Gateway & NAT</a>
+                    <a href="#ipv6" class="nav-link border-b-2 pb-1">IPv6</a>
+                    <a href="#comparativo" class="nav-link border-b-2 pb-1">Comparativo</a>
+                    <a href="#diagnostico" class="nav-link border-b-2 pb-1">Diagnóstico</a>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <main class="container mx-auto px-6 py-12">
+        <section id="intro" class="text-center mb-24">
+            <h1 class="text-4xl md:text-5xl font-bold mb-4 text-gray-800">Desvendando os Pilares da Internet</h1>
+            <p class="text-lg md:text-xl max-w-3xl mx-auto text-gray-600">Uma exploração interativa dos conceitos essenciais que fazem a comunicação digital acontecer. Navegue pelos tópicos para aprender de forma prática.</p>
+        </section>
+
+        <section id="ipv4" class="py-16">
+            <div class="grid md:grid-cols-2 gap-12 items-center">
+                <div>
+                    <h2 class="text-3xl font-bold mb-4 text-gray-800">IPv4: O Endereço Clássico</h2>
+                    <p class="mb-4 text-gray-600">O IPv4 é um endereço de 32 bits, representado por quatro números (octetos) de 0 a 255. Por décadas, foi o principal sistema de endereçamento da internet, mas seu limite de 4,3 bilhões de endereços está praticamente esgotado.</p>
+                    <p class="text-gray-600">Cada octeto representa 8 bits. Passe o mouse sobre o endereço ao lado para ver a representação binária de cada parte e entender sua estrutura fundamental.</p>
+                </div>
+                <div class="interactive-box p-8 text-center">
+                    <h3 class="text-lg font-semibold mb-4 text-gray-700">Analisador de Endereço IPv4</h3>
+                    <div id="ipv4-visualizer" class="flex justify-center items-center space-x-2 text-2xl font-mono bg-gray-100 p-4 rounded-lg">
+                        <span class="octet" data-binary="11000000">192</span>
+                        <span>.</span>
+                        <span class="octet" data-binary="10101000">168</span>
+                        <span>.</span>
+                        <span class="octet" data-binary="00000001">1</span>
+                        <span>.</span>
+                        <span class="octet" data-binary="00001010">10</span>
+                    </div>
+                    <div id="binary-display" class="mt-4 text-xl font-mono text-blue-600 h-8"></div>
+                </div>
+            </div>
+        </section>
+
+        <section id="mascara" class="py-16 bg-gray-50 rounded-2xl">
+            <div class="grid md:grid-cols-2 gap-12 items-center">
+                <div class="order-2 md:order-1">
+                     <div class="interactive-box p-8">
+                        <h3 class="text-lg font-semibold mb-4 text-gray-700">Calculadora de Rede</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label for="ip-input" class="block text-sm font-medium text-gray-700">Endereço IP</label>
+                                <input type="text" id="ip-input" value="192.168.1.10" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 font-mono">
+                            </div>
+                            <div>
+                                <label for="mask-select" class="block text-sm font-medium text-gray-700">Máscara de Rede (CIDR)</label>
+                                <select id="mask-select" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 rounded-md">
+                                    <option value="24">/24 (255.255.255.0)</option>
+                                    <option value="16">/16 (255.255.0.0)</option>
+                                    <option value="26">/26 (255.255.255.192)</option>
+                                    <option value="8">/8 (255.0.0.0)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mt-6 pt-6 border-t">
+                            <h4 class="font-semibold text-gray-700">Resultados:</h4>
+                            <div class="mt-2 space-y-2 font-mono text-sm">
+                                <p>Endereço de Rede: <span id="network-id" class="font-bold text-green-600"></span></p>
+                                <p>Endereço de Host: <span id="host-id" class="font-bold text-purple-600"></span></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="order-1 md:order-2">
+                    <h2 class="text-3xl font-bold mb-4 text-gray-800">Máscara de Rede: Dividindo o Endereço</h2>
+                    <p class="mb-4 text-gray-600">A máscara de rede é um filtro que separa um endereço IP em duas partes: a porção de **rede** (que identifica o "bairro" digital) e a porção de **host** (que identifica a "casa" específica nesse bairro).</p>
+                    <p class="text-gray-600">Use a calculadora ao lado para ver como diferentes máscaras alteram a divisão entre rede e host para um mesmo IP. Isso é fundamental para organizar redes e controlar o tráfego.</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="gateway" class="py-16">
+            <h2 class="text-3xl font-bold mb-8 text-center text-gray-800">Gateway Padrão e NAT</h2>
+            <p class="text-lg max-w-3xl mx-auto text-center text-gray-600 mb-12">Esses dois conceitos trabalham juntos para conectar sua rede local à internet. O Gateway é a "porta de saída", e o NAT é o "tradutor" que permite que vários dispositivos compartilhem um único endereço público.</p>
+            <div class="interactive-box p-8">
+                <div class="grid md:grid-cols-3 gap-4 text-center items-center">
+                    <div class="space-y-2">
+                        <div class="font-semibold text-gray-700">Sua Rede Local (IPs Privados)</div>
+                        <div class="p-3 bg-blue-100 rounded-lg">PC 1: 192.168.1.10</div>
+                        <div class="p-3 bg-blue-100 rounded-lg">Celular: 192.168.1.15</div>
+                    </div>
+                    
+                    <div class="relative">
+                        <div id="traffic-line-1" class="absolute left-0 top-1/2 w-1/2 h-0.5 bg-gray-300 transition-all duration-500"></div>
+                        <div id="traffic-line-2" class="absolute right-0 top-1/2 w-1/2 h-0.5 bg-gray-300 transition-all duration-500"></div>
+                        <div id="router-box" class="p-4 bg-white border-2 border-blue-500 rounded-xl z-10 relative cursor-pointer">
+                            <h4 class="font-bold">Roteador</h4>
+                            <p class="text-sm">Gateway: 192.168.1.1</p>
+                            <p class="text-sm">NAT Ativo</p>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="font-semibold text-gray-700">Internet (IP Público)</div>
+                        <div class="p-3 bg-green-100 rounded-lg mt-2">Seu IP Público: 203.0.113.50</div>
+                    </div>
+                </div>
+                 <p id="nat-explanation" class="text-center mt-6 text-gray-600 h-10 transition-opacity duration-300">Passe o mouse sobre o roteador para ver a mágica do NAT.</p>
+            </div>
+        </section>
+
+        <section id="ipv6" class="py-16 bg-gray-50 rounded-2xl">
+            <div class="grid md:grid-cols-2 gap-12 items-center">
+                <div>
+                    <h2 class="text-3xl font-bold mb-4 text-gray-800">IPv6: O Futuro da Rede</h2>
+                    <p class="mb-4 text-gray-600">O IPv6 é a solução para o esgotamento do IPv4. Com um endereço de 128 bits, ele oferece um número quase infinito de endereços (340 undecilhões). Seu formato usa oito grupos de quatro dígitos hexadecimais.</p>
+                    <p class="text-gray-600">Uma de suas características é a capacidade de ser abreviado. Use o botão ao lado para ver como um endereço longo pode ser compactado, tornando-o mais fácil de gerenciar.</p>
+                </div>
+                <div class="interactive-box p-8 text-center">
+                    <h3 class="text-lg font-semibold mb-4 text-gray-700">Compressor de Endereço IPv6</h3>
+                    <div class="font-mono text-sm md:text-base break-all bg-gray-100 p-4 rounded-lg">
+                        <p id="ipv6-address">2001:0db8:85a3:0000:0000:8a2e:0370:7334</p>
+                    </div>
+                    <button id="compress-btn" class="mt-4 px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 transition-colors">Compactar</button>
+                </div>
+            </div>
+        </section>
+
+        <section id="comparativo" class="py-16">
+            <h2 class="text-3xl font-bold mb-8 text-center text-gray-800">IPv4 vs. IPv6: Lado a Lado</h2>
+             <p class="text-lg max-w-3xl mx-auto text-center text-gray-600 mb-12">Embora o IPv4 ainda seja dominante, o IPv6 é o futuro. Veja o gráfico para entender a escala da diferença e use os botões para comparar suas características principais.</p>
+            <div class="chart-container mb-12">
+                <canvas id="address-space-chart"></canvas>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+                <div class="interactive-box p-6">
+                    <h3 class="text-2xl font-bold mb-4 text-center">IPv4</h3>
+                    <div id="ipv4-details" class="space-y-2 text-center text-lg h-32 flex flex-col justify-center"></div>
+                </div>
+                <div class="interactive-box p-6">
+                    <h3 class="text-2xl font-bold mb-4 text-center">IPv6</h3>
+                    <div id="ipv6-details" class="space-y-2 text-center text-lg h-32 flex flex-col justify-center"></div>
+                </div>
+            </div>
+             <div id="comparison-buttons" class="flex flex-wrap justify-center gap-4 mt-8">
+                <button data-feature="tamanho" class="comparison-btn px-4 py-2 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-100 transition-colors">Tamanho</button>
+                <button data-feature="formato" class="comparison-btn px-4 py-2 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-100 transition-colors">Formato</button>
+                <button data-feature="enderecos" class="comparison-btn px-4 py-2 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-100 transition-colors">Nº de Endereços</button>
+                <button data-feature="nat" class="comparison-btn px-4 py-2 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-100 transition-colors">Necessidade de NAT</button>
+             </div>
+        </section>
+        
+        <section id="diagnostico" class="py-16 bg-gray-50 rounded-2xl">
+            <h2 class="text-3xl font-bold mb-8 text-center text-gray-800">Diagnóstico de Rede: Ping e Traceroute</h2>
+            
+            <div class="max-w-4xl mx-auto mb-12">
+                 <p class="text-center text-gray-600 mb-8">Ping e Traceroute são ferramentas essenciais que usam o protocolo ICMP (Internet Control Message Protocol) para testar e depurar problemas de rede. O ICMP não transporta dados de usuário, mas sim mensagens de controle e erro.</p>
+                <div class="grid md:grid-cols-2 gap-8 text-sm">
+                    <div class="bg-white p-6 rounded-lg border">
+                        <h3 class="font-bold text-lg mb-2 text-green-600">Ping (Teste de Conectividade)</h3>
+                        <p><strong>Objetivo:</strong> Verificar se um host de destino está alcançável e medir o tempo de ida e volta (latência).</p>
+                        <p class="mt-2"><strong>Como funciona:</strong> Envia uma mensagem <code class="bg-gray-200 px-1 rounded">ICMP Echo Request</code>. O destino, se online, responde com uma <code class="bg-gray-200 px-1 rounded">ICMP Echo Reply</code>.</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg border">
+                        <h3 class="font-bold text-lg mb-2 text-yellow-600">Traceroute (Mapeamento de Rota)</h3>
+                        <p><strong>Objetivo:</strong> Descobrir a rota (a sequência de roteadores) que um pacote percorre até o destino.</p>
+                        <p class="mt-2"><strong>Como funciona:</strong> Envia pacotes com um TTL (Time-To-Live) crescente. Cada roteador no caminho descarta o pacote quando o TTL expira e envia de volta uma mensagem <code class="bg-gray-200 px-1 rounded">ICMP Time Exceeded</code>, revelando sua identidade.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="interactive-box p-8 mb-12 relative overflow-hidden" id="animation-container">
+                <h3 class="text-xl font-bold mb-6 text-center text-gray-700">Simulação Gráfica</h3>
+                <div id="packet" class="packet bg-blue-500"></div>
+                <div class="flex justify-between items-center">
+                    <div id="hostA" class="text-center">
+                        <div class="w-16 h-16 bg-blue-200 rounded-full mx-auto flex items-center justify-center text-3xl">💻</div>
+                        <p class="font-semibold mt-2">Seu PC</p>
+                    </div>
+                    <div class="flex-grow flex justify-around items-center px-4">
+                        <div id="hop1" class="text-center">
+                            <div class="w-12 h-12 bg-gray-200 rounded-full mx-auto flex items-center justify-center text-2xl">📡</div>
+                            <p class="text-sm mt-1">Roteador 1</p>
+                        </div>
+                         <div id="hop2" class="text-center">
+                            <div class="w-12 h-12 bg-gray-200 rounded-full mx-auto flex items-center justify-center text-2xl">📡</div>
+                            <p class="text-sm mt-1">Roteador 2</p>
+                        </div>
+                    </div>
+                    <div id="hostB" class="text-center">
+                         <div class="w-16 h-16 bg-green-200 rounded-full mx-auto flex items-center justify-center text-3xl">🌐</div>
+                        <p class="font-semibold mt-2">Servidor Alvo</p>
+                    </div>
+                </div>
+                <div id="sim-controls" class="flex justify-center gap-4 mt-6">
+                    <button id="sim-ping-btn" class="px-6 py-2 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700 transition-colors">Simular Ping</button>
+                    <button id="sim-trace-btn" class="px-6 py-2 bg-yellow-500 text-white font-semibold rounded-lg shadow-md hover:bg-yellow-600 transition-colors">Simular Traceroute</button>
+                    <button id="sim-continue-btn" class="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 transition-colors hidden">Continuar</button>
+                </div>
+                 <p id="sim-status" class="text-center mt-4 h-6 text-gray-600"></p>
+            </div>
+            
+            <div class="interactive-box p-8">
+                <h3 class="text-xl font-bold mb-4 text-center text-gray-700">Terminal Simulado</h3>
+                <div id="console-output" class="console">
+                    <span class="text-gray-400">Digite um comando e pressione Enter (ex: 'ping 8.8.8.8')</span>
+                </div>
+                <div class="flex items-center bg-[#1E293B] p-2 rounded-b-lg">
+                    <span class="text-green-400 mr-2">$</span>
+                    <input type="text" id="command-input" class="command-input" placeholder="Seu comando aqui...">
+                </div>
+                 <div id="output-explanation" class="mt-6 p-4 bg-gray-100 border border-gray-200 rounded-lg text-sm text-gray-700 hidden">
+                    <!-- O conteúdo da explicação será inserido aqui pelo JavaScript -->
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <footer class="bg-gray-800 text-white mt-16">
+        <div class="container mx-auto px-6 py-8 text-center">
+            <p>&copy; 2025 Explorador Interativo de Redes. Criado para facilitar o aprendizado.</p>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+
+            const sections = document.querySelectorAll('main section[id]');
+            const navLinks = document.querySelectorAll('#nav-menu a');
+
+            function updateActiveLink() {
+                let current = '';
+                sections.forEach(section => {
+                    const sectionTop = section.offsetTop;
+                    if (pageYOffset >= sectionTop - 100) {
+                        current = section.getAttribute('id');
+                    }
+                });
+
+                navLinks.forEach(link => {
+                    link.classList.remove('active-link');
+                    link.classList.add('inactive-link');
+                    if (link.getAttribute('href').substring(1) === current) {
+                        link.classList.add('active-link');
+                        link.classList.remove('inactive-link');
+                    }
+                });
+            }
+
+            window.addEventListener('scroll', updateActiveLink);
+            updateActiveLink();
+
+            const ipv4Octets = document.querySelectorAll('.octet');
+            const binaryDisplay = document.getElementById('binary-display');
+            ipv4Octets.forEach(octet => {
+                octet.addEventListener('mouseenter', () => {
+                    binaryDisplay.textContent = octet.dataset.binary;
+                });
+                octet.addEventListener('mouseleave', () => {
+                    binaryDisplay.textContent = '';
+                });
+            });
+
+            const ipInput = document.getElementById('ip-input');
+            const maskSelect = document.getElementById('mask-select');
+            const networkIdEl = document.getElementById('network-id');
+            const hostIdEl = document.getElementById('host-id');
+
+            function calculateSubnet() {
+                try {
+                    const ipParts = ipInput.value.split('.').map(Number);
+                    if (ipParts.length !== 4 || ipParts.some(p => isNaN(p) || p < 0 || p > 255)) {
+                        networkIdEl.textContent = 'IP inválido';
+                        hostIdEl.textContent = '';
+                        return;
+                    }
+
+                    const cidr = parseInt(maskSelect.value, 10);
+                    const maskParts = [0, 0, 0, 0];
+                    for (let i = 0; i < cidr; i++) {
+                        maskParts[Math.floor(i / 8)] |= 1 << (7 - (i % 8));
+                    }
+
+                    const networkParts = ipParts.map((part, i) => part & maskParts[i]);
+                    const hostParts = ipParts.map((part, i) => part & ~maskParts[i]);
+                    
+                    networkIdEl.textContent = networkParts.join('.');
+                    hostIdEl.textContent = hostParts.join('.');
+                } catch (e) {
+                    networkIdEl.textContent = 'Erro';
+                    hostIdEl.textContent = '';
+                }
+            }
+            ipInput.addEventListener('input', calculateSubnet);
+            maskSelect.addEventListener('change', calculateSubnet);
+            calculateSubnet();
+            
+            const routerBox = document.getElementById('router-box');
+            const trafficLine1 = document.getElementById('traffic-line-1');
+            const trafficLine2 = document.getElementById('traffic-line-2');
+            const natExplanation = document.getElementById('nat-explanation');
+
+            routerBox.addEventListener('mouseenter', () => {
+                trafficLine1.style.backgroundColor = '#3B82F6';
+                trafficLine2.style.backgroundColor = '#10B981';
+                natExplanation.textContent = 'O roteador traduz IPs privados (azul) para um IP público (verde).';
+                natExplanation.style.opacity = '1';
+            });
+
+             routerBox.addEventListener('mouseleave', () => {
+                trafficLine1.style.backgroundColor = '#D1D5DB';
+                trafficLine2.style.backgroundColor = '#D1D5DB';
+                natExplanation.textContent = 'Passe o mouse sobre o roteador para ver a mágica do NAT.';
+                natExplanation.style.opacity = '1';
+            });
+
+
+            const compressBtn = document.getElementById('compress-btn');
+            const ipv6AddressEl = document.getElementById('ipv6-address');
+            const originalIpv6 = '2001:0db8:85a3:0000:0000:8a2e:0370:7334';
+            const compressedIpv6 = '2001:db8:85a3::8a2e:370:7334';
+            let isCompressed = false;
+
+            compressBtn.addEventListener('click', () => {
+                if (isCompressed) {
+                    ipv6AddressEl.textContent = originalIpv6;
+                    compressBtn.textContent = 'Compactar';
+                } else {
+                    ipv6AddressEl.textContent = compressedIpv6;
+                    compressBtn.textContent = 'Restaurar';
+                }
+                isCompressed = !isCompressed;
+            });
+            
+            const comparisonData = {
+                tamanho: { ipv4: '32 bits', ipv6: '128 bits' },
+                formato: { ipv4: 'Decimal (4 octetos)', ipv6: 'Hexadecimal (8 grupos)' },
+                enderecos: { ipv4: '~4,3 bilhões', ipv6: '~340 undecilhões' },
+                nat: { ipv4: 'Alta necessidade', ipv6: 'Praticamente nula' }
+            };
+            const ipv4Details = document.getElementById('ipv4-details');
+            const ipv6Details = document.getElementById('ipv6-details');
+            const comparisonButtons = document.querySelectorAll('.comparison-btn');
+
+            function updateComparison(feature) {
+                ipv4Details.innerHTML = `<p>${comparisonData[feature].ipv4}</p>`;
+                ipv6Details.innerHTML = `<p>${comparisonData[feature].ipv6}</p>`;
+                
+                comparisonButtons.forEach(btn => {
+                    btn.classList.remove('bg-blue-600', 'text-white');
+                    btn.classList.add('bg-white', 'border-gray-300');
+                    if (btn.dataset.feature === feature) {
+                        btn.classList.add('bg-blue-600', 'text-white');
+                        btn.classList.remove('bg-white', 'border-gray-300');
+                    }
+                });
+            }
+            comparisonButtons.forEach(btn => {
+                btn.addEventListener('click', () => updateComparison(btn.dataset.feature));
+            });
+            updateComparison('tamanho');
+
+
+            const ctx = document.getElementById('address-space-chart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['IPv4', 'IPv6'],
+                    datasets: [{
+                        label: 'Número de Endereços (Escala Logarítmica)',
+                        data: [4.3e9, 3.4e38],
+                        backgroundColor: [
+                            'rgba(59, 130, 246, 0.7)',
+                            'rgba(16, 185, 129, 0.7)'
+                        ],
+                        borderColor: [
+                            'rgba(59, 130, 246, 1)',
+                            'rgba(16, 185, 129, 1)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    let value = context.raw;
+                                    return value.toExponential(2);
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            type: 'logarithmic',
+                            title: {
+                                display: true,
+                                text: 'Quantidade de Endereços'
+                            }
+                        }
+                    }
+                }
+            });
+
+            const commandInputEl = document.getElementById('command-input');
+            const consoleOutputEl = document.getElementById('console-output');
+            const outputExplanationEl = document.getElementById('output-explanation');
+            let simulationRunning = false;
+            
+            const explanationContent = {
+                ping: (target) => `
+                    <h4 class="font-bold mb-2 text-gray-800">Analisando a Resposta do Ping:</h4>
+                    <ul class="list-disc list-inside space-y-1">
+                        <li><strong>Resposta de ${target}:</strong> Confirma que o host de destino está online e respondeu ao pedido.</li>
+                        <li><strong>bytes=32:</strong> O tamanho do pacote ICMP enviado foi de 32 bytes.</li>
+                        <li><strong>tempo=XXms:</strong> É a latência, o tempo que o pacote levou para ir e voltar (Round Trip Time). Valores menores são melhores.</li>
+                        <li><strong>TTL=XXX:</strong> "Time To Live". É um contador que evita que pacotes fiquem circulando infinitamente na rede. Cada roteador pelo qual o pacote passa diminui esse valor em 1.</li>
+                    </ul>`,
+                traceroute: `
+                    <h4 class="font-bold mb-2 text-gray-800">Analisando a Resposta do Traceroute:</h4>
+                    <ul class="list-disc list-inside space-y-1">
+                        <li><strong>1, 2, 3...:</strong> O número do "salto" (hop) na rota até o destino. Cada número é um roteador diferente no caminho.</li>
+                        <li><strong>&lt;1 ms, 8 ms...:</strong> São os tempos de ida e volta para cada um dos três pacotes de teste enviados para aquele roteador específico. Asteriscos (*) indicam que não houve resposta.</li>
+                        <li><strong>192.168.1.1:</strong> O endereço IP do roteador naquele salto. O primeiro é geralmente o seu gateway local (seu roteador).</li>
+                        <li><strong>Rastreamento concluído.:</strong> Indica que o último pacote chegou com sucesso ao destino final.</li>
+                    </ul>`
+            };
+
+            function showExplanation(type, target) {
+                outputExplanationEl.innerHTML = type === 'ping' ? explanationContent.ping(target) : explanationContent.traceroute;
+                outputExplanationEl.classList.remove('hidden');
+            }
+
+            async function runPing(target) {
+                consoleOutputEl.innerHTML += `\n> Disparando para ${target} com 32 bytes de dados:\n`;
+                for (let i = 0; i < 4; i++) {
+                    await new Promise(res => setTimeout(res, 800));
+                    const time = Math.floor(Math.random() * (25 - 12) + 12);
+                    const ttl = Math.floor(Math.random() * (120 - 110) + 110);
+                    consoleOutputEl.innerHTML += `Resposta de ${target}: bytes=32 tempo=${time}ms TTL=${ttl}\n`;
+                    consoleOutputEl.scrollTop = consoleOutputEl.scrollHeight;
+                }
+            }
+            
+            async function runTraceroute(target) {
+                consoleOutputEl.innerHTML += `\n> Rastreando a rota para ${target} com no máximo 30 saltos:\n`;
+                const hops = [
+                    '1   <1 ms    <1 ms    <1 ms   192.168.1.1',
+                    '2    8 ms     7 ms     8 ms   10.0.0.1',
+                    '3   12 ms    11 ms    12 ms   200.204.0.1',
+                    '4   11 ms    12 ms    11 ms   142.250.211.5',
+                    '5   15 ms    14 ms    15 ms   ' + target
+                ];
+                for (const hop of hops) {
+                    await new Promise(res => setTimeout(res, 1000));
+                    consoleOutputEl.innerHTML += `${hop}\n`;
+                    consoleOutputEl.scrollTop = consoleOutputEl.scrollHeight;
+                }
+                consoleOutputEl.innerHTML += `\nRastreamento concluído.`;
+                consoleOutputEl.scrollTop = consoleOutputEl.scrollHeight;
+            }
+
+            commandInputEl.addEventListener('keydown', async (e) => {
+                if (e.key === 'Enter') {
+                    if (simulationRunning) return;
+                    
+                    const commandText = commandInputEl.value.trim();
+                    if (!commandText) return;
+                    
+                    outputExplanationEl.classList.add('hidden');
+                    consoleOutputEl.innerHTML += `\n<span class="text-green-400">$</span> ${commandText}`;
+                    commandInputEl.value = '';
+
+                    const [command, target = '8.8.8.8'] = commandText.split(' ');
+                    
+                    simulationRunning = true;
+                    if (command === 'ping') {
+                        await runPing(target);
+                        showExplanation('ping', target);
+                    } else if (command === 'traceroute' || command === 'tracert') {
+                        await runTraceroute(target);
+                        showExplanation('traceroute');
+                    } else {
+                        consoleOutputEl.innerHTML += `\nComando não reconhecido: ${command}`;
+                    }
+                    simulationRunning = false;
+                    consoleOutputEl.scrollTop = consoleOutputEl.scrollHeight;
+                }
+            });
+            
+            const packetEl = document.getElementById('packet');
+            const hostAEl = document.getElementById('hostA');
+            const hostBEl = document.getElementById('hostB');
+            const hop1El = document.getElementById('hop1');
+            const hop2El = document.getElementById('hop2');
+            const simPingBtn = document.getElementById('sim-ping-btn');
+            const simTraceBtn = document.getElementById('sim-trace-btn');
+            const simContinueBtn = document.getElementById('sim-continue-btn');
+            const simStatusEl = document.getElementById('sim-status');
+            const animationContainer = document.getElementById('animation-container');
+            let animRunning = false;
+            let resolveContinuePromise;
+
+            function waitForContinue() {
+                simContinueBtn.classList.remove('hidden');
+                return new Promise(resolve => {
+                    resolveContinuePromise = resolve;
+                });
+            }
+
+            simContinueBtn.addEventListener('click', () => {
+                if (resolveContinuePromise) {
+                    simContinueBtn.classList.add('hidden');
+                    resolveContinuePromise();
+                    resolveContinuePromise = null;
+                }
+            });
+
+            const getElementCenter = (el) => {
+                const rect = el.getBoundingClientRect();
+                const containerRect = animationContainer.getBoundingClientRect();
+                return {
+                    x: rect.left - containerRect.left + rect.width / 2 - 10,
+                    y: rect.top - containerRect.top + rect.height / 2 - 10,
+                };
+            };
+            
+            function movePacket(targetPos) {
+                return new Promise(resolve => {
+                    packetEl.style.transform = `translate(${targetPos.x}px, ${targetPos.y}px)`;
+                    setTimeout(resolve, 1000);
+                });
+            }
+
+            simPingBtn.addEventListener('click', async () => {
+                if (animRunning) return;
+                animRunning = true;
+                simPingBtn.disabled = true;
+                simTraceBtn.disabled = true;
+                simStatusEl.textContent = 'Enviando ICMP Echo Request...';
+                
+                const posA = getElementCenter(hostAEl);
+                const posB = getElementCenter(hostBEl);
+                
+                packetEl.style.transform = `translate(${posA.x}px, ${posA.y}px)`;
+                packetEl.style.backgroundColor = '#3B82F6';
+                packetEl.style.opacity = '1';
+
+                await movePacket(posB);
+                simStatusEl.textContent = 'Pacote chegou ao destino. Clique em "Continuar" para ver o retorno.';
+                
+                await waitForContinue();
+                
+                simStatusEl.textContent = 'Recebendo ICMP Echo Reply...';
+                packetEl.style.backgroundColor = '#10B981';
+
+                await movePacket(posA);
+
+                packetEl.style.opacity = '0';
+                simStatusEl.textContent = 'Ping completo!';
+                animRunning = false;
+                simPingBtn.disabled = false;
+                simTraceBtn.disabled = false;
+            });
+
+            simTraceBtn.addEventListener('click', async () => {
+                if (animRunning) return;
+                animRunning = true;
+                simPingBtn.disabled = true;
+                simTraceBtn.disabled = true;
+
+                const posA = getElementCenter(hostAEl);
+                const posH1 = getElementCenter(hop1El);
+                const posH2 = getElementCenter(hop2El);
+                const posB = getElementCenter(hostBEl);
+                
+                packetEl.style.transform = `translate(${posA.x}px, ${posA.y}px)`;
+                packetEl.style.backgroundColor = '#F59E0B';
+                packetEl.style.opacity = '1';
+
+                simStatusEl.textContent = 'TTL=1, pacote vai ao Roteador 1...';
+                await movePacket(posH1);
+                simStatusEl.textContent = 'Roteador 1 responde com Time Exceeded...';
+                await movePacket(posA);
+                simStatusEl.textContent = 'Roteador 1 descoberto! Clique em "Continuar".';
+                await waitForContinue();
+
+                simStatusEl.textContent = 'TTL=2, pacote vai ao Roteador 2...';
+                await movePacket(posH2);
+                simStatusEl.textContent = 'Roteador 2 responde com Time Exceeded...';
+                await movePacket(posA);
+                simStatusEl.textContent = 'Roteador 2 descoberto! Clique em "Continuar".';
+                await waitForContinue();
+                
+                simStatusEl.textContent = 'TTL=3, pacote vai ao Servidor Alvo...';
+                await movePacket(posB);
+                simStatusEl.textContent = 'Servidor Alvo responde com Echo Reply...';
+                packetEl.style.backgroundColor = '#10B981';
+                await movePacket(posA);
+                
+                packetEl.style.opacity = '0';
+                simStatusEl.textContent = 'Traceroute completo!';
+                animRunning = false;
+                simPingBtn.disabled = false;
+                simTraceBtn.disabled = false;
+            });
+        });
+    </script>
+</body>
+</html>
+
